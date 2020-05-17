@@ -27,6 +27,8 @@ define Build/Prepare
 endef
 
 MAKE_OPTS:= \
+	ARCH="$(LINUX_KARCH)" \
+	CROSS_COMPILE="$(TARGET_CROSS)" \
 	$(KERNEL_MAKE_FLAGS) \
 	M="$(PKG_BUILD_DIR)"
 
