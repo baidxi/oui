@@ -127,7 +127,8 @@ export default {
         batch.push(['iwinfo', 'txpowerlist', {device}]);
         batch.push(['iwinfo', 'countrylist', {device}]);
 
-        this.$ubus.callBatch(batch).then(rs => {
+        this.$ubus.callBatch(batch, 5000).then(rs => {
+
           const channels = [['auto', this.$t('Automatic')]];
           const info = rs[0];
           const freqlist = rs[1].results
@@ -148,10 +149,18 @@ export default {
             countrylist.push([c.code, `${c.code} - ${c.country}`]);
           });
 
-          const hwmodes = ['11g'];
+          const hwmodes = [];
 
-          if (info.hwmodes.indexOf('a') > -1 || info.hwmodes.indexOf('ac') > -1)
+          if (info.hwmodes.indexOf('n') > -1 && info.hwmodes.indexOf('g'))
+            hwmodes.push('11ng')
+          else
+            hwmodes.push('11g')
+
+          if (info.hwmodes.indexOf('a') > -1)
             hwmodes.push('11a');
+
+          if (info.hwmodes.indexOf('ac') > -1)
+            hwmodes.push('11ac')
 
           this.radios.push({
             name: device,
