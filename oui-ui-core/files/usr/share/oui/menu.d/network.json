@@ -17,7 +17,7 @@
         "index": 20
     },
     "network/switch": {
-        "title": "Switch",
+        "title": "VLAN",
         "acls": [ "network" ],
         "files": [ "/sbin/swconfig" ],
         "view": "network/switch",
@@ -55,5 +55,11 @@
         "acls": [ "diagnostics" ],
         "view": "network/diagnostics",
         "index": 80
+    },
+    "network/qos": {
+        "title": "Smart Queue Management",
+        "acls": [ "qos" ],
+        "view": "network/qos",
+        "index": 90
     }
 }

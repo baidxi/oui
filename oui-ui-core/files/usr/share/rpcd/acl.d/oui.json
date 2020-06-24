@@ -91,7 +91,19 @@
 			}
 		}
 	},
-
+	"qos": {
+		"description": "Smart Queue Management",
+		"read": {
+			"uci": [
+				"sqm"
+			]
+		},
+		"write": {
+			"uci": [
+				"sqm"
+			]
+		}
+	},
 	"system": {
 		"description": "General system settings",
 		"read": {

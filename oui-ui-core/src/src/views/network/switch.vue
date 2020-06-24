@@ -6,6 +6,12 @@
           <uci-option-switch v-if="s.attrs['enable_vlan']" :label="$t('Enable VLAN functionality')" name="enable_vlan"></uci-option-switch>
           <uci-option-switch v-if="s.attrs['enable_learning']" :label="$t('Enable learning and aging')" name="enable_learning"></uci-option-switch>
         </uci-section>
+        <uci-section name="wan">
+          <uci-option-list :label="$t('wan interface')" name="ifname" :options="devices" allow-create></uci-option-list>
+        </uci-section>
+        <uci-section name="lan">
+          <uci-option-list :label="$t('lan interface')" name="ifname" :options="devices" allow-create></uci-option-list>
+        </uci-section>
         <uci-section title="VLAN" type="switch_vlan" :filter="filterVlanSection" table addable :add="addVlanSection" :options="{swname: s.name, num_vlans: s.num_vlans, max_vid: s.max_vid}">
           <uci-option-input label="VLAN ID" name="vlan" :rules="vidValidator" required></uci-option-input>
           <uci-option-list v-for="(port, i) in s.ports" :key="i" :header="portLabel(i, port)" :name="'port' + i" :options="switchPortState" initial="n" required :load="loadPort" :save="savePort"></uci-option-list>
@@ -24,7 +30,10 @@ export default {
         ['n', this.$t('Switch port state - off')],
         ['u', this.$t('Switch port state - untagged')],
         ['t', this.$t('Switch port state - tagged')]
-      ]
+      ],
+      num_port:'',
+      devices:[],
+      enable_vlan:''
     }
   },
   methods: {
@@ -56,7 +65,14 @@ export default {
     },
     addVlanSection(self) {
       const usedVID = {};
-
+      if (self.uciSections === undefined) {
+        for (let i = 1; i <= this.num_port; i++) {
+          const sid = this.$uci.add('network', 'switch_vlan');
+          this.$uci.set('network', sid, 'device', self.options.swname);
+          this.$uci.set('network', sid, 'vlan', i.toString());
+          return sid;
+        }
+      }
       self.uciSections.forEach(s => {
         if (s.vlan)
           usedVID[s.vlan] = true;
@@ -77,6 +93,10 @@ export default {
 
       if (!val)
         return;
+
+      if (sections === undefined) {
+        return;
+      }
 
       for (let i = 0; i < sections.length; i++) {
         const sid = sections[i]['.name'];
@@ -112,7 +132,14 @@ export default {
       return v;
     },
     savePort(sid, val, self) {
-      const ports = this.$uci.get('network', sid, 'ports').split(' ');
+      let ports = this.$uci.get('network', sid, 'ports');
+      console.log(ports);
+      if (ports === undefined) {
+        console.log(ports);
+        ports = new Array(this.num_port);
+      } else {
+        ports = ports.split(' ');
+      }
       const id = self.name.substr(4);
 
       let i = ports.indexOf(id);
@@ -142,6 +169,7 @@ export default {
           const info = rs[0].info;
           const ports = rs[1].ports;
           const attrs = {};
+          this.num_port = ports.length + 1;
 
           info.switch.forEach(attr => {
             attrs[attr.name] = true;
@@ -161,6 +189,9 @@ export default {
           }, info));
         });
       });
+    });
+    this.$network.load().then(() => {
+      this.devices = this.$network.getDevices().map(d => d.name);
     });
   }
 }
