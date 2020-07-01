@@ -1,63 +1,50 @@
 <template>
   <div>
-    <el-table :data="interfaces">
-      <el-table-column :label="$t('Network')" width="140">
-        <template v-slot="{ row }">
-          <network-badge :iface="row.name" :device="row.getDevice() && row.getDevice().name"></network-badge>
-        </template>
-      </el-table-column>
-      <el-table-column :label="$t('Status')">
-        <template v-slot="{ row }">
-          <strong>{{ $t('Uptime') }}</strong>: {{ row.isUp() ? '%t'.format(row.getUptime()) : $t('Interface is down') }}<br/>
-          <strong>MAC</strong>: {{ row.getDevice() ? row.getDevice().macaddr : '' }}<br/>
-          <strong>RX</strong>: {{ '%mB'.format(row.getStatistics().rx_bytes) }}<br/>
-          <strong>TX</strong>: {{ '%mB'.format(row.getStatistics().tx_bytes) }}<br/>
-          <strong>IPv4</strong>: {{ row.getIPv4Addrs().join(',') }}<br/>
-          <strong>IPv6</strong>: {{ row.getIPv6Addrs().join(',') }}<br/>
-        </template>
-      </el-table-column>
-      <el-table-column label="#">
-        <template v-slot="{ row }">
-          <el-button size="mini" @click="ifup(row.name)">{{ $t('Start') }}</el-button>
-          <el-button size="mini" @click="ifdown(row.name)">{{ $t('Stop') }}</el-button>
-          <el-button type="primary" size="mini" @click="edit(row.name)">{{ $t('Edit') }}</el-button>
-          <el-button type="danger" size="mini" @click="del(row.name)">{{ $t('Delete') }}</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    <el-button type="primary" size="small" style="margin-top: 10px" @click="handleAdd">+ {{ $t('Add interface') }}</el-button>
-    <el-dialog :title="dialogTitle" :visible.sync="dialogVisible" custom-class="interface-edit-dialog">
-      <uci-form config="network" v-if="dialogVisible" :apply-timeout="15">
-        <uci-section :name="editorIface">
-          <uci-tab :title="$t('General Settings')" name="general">
-            <uci-option-switch :label="$t('Start on boot')" name="auto" initial="1"></uci-option-switch>
-            <uci-option-list :label="$t('Protocol')" name="proto" :options="protocols" initial="none" required @change="protoChanged"></uci-option-list>
-          </uci-tab>
-          <uci-tab :title="$t('Advanced Settings')" name="advanced">
-            <uci-option-switch :label="$t('Use builtin IPv6-management')" name="delegate" initial="1"></uci-option-switch>
-            <uci-option-switch :label="$t('Force link')" name="force_link" :initial="proto === 'static' ? true : false" :description="$t('Set interface properties regardless of the link carrier (If set, carrier sense events do not invoke hotplug handlers).')"></uci-option-switch>
-          </uci-tab>
-          <uci-tab :title="$t('Physical Settings')" name="physical" v-if="proto !== 'pppoe'">
-            <template v-if="!virtual">
-              <uci-option-switch :label="$t('Bridge interfaces')" name="type" active-value="bridge" :save="saveType" depend="proto == 'static' || proto == 'dhcp' || proto == 'none'" :description="$t('creates a bridge over specified interface(s)')"></uci-option-switch>
-              <uci-option-switch :label="$t('Enable STP')" name="stp" depend="type" :description="$t('Enables the Spanning Tree Protocol on this bridge')"></uci-option-switch>
-              <uci-option-switch :label="$t('Enable IGMP')" name="igmp_snooping" depend="type" :description="$t('Enables IGMP snooping on this bridge')"></uci-option-switch>
+    <el-tabs v-if="interfaces.length > 0" v-model="editorIface" type="border-card" @tab-click="update_info">
+      <el-tab-pane v-for="iface in interfaces" :key="iface.name" :name="iface.name" :label="iface.name">
+        <el-table :data="info">
+          <el-table-column :label="$t('Status')">
+            <template v-slot="{ row }">
+              <strong>{{ $t('Uptime') }}</strong>: {{ row.isUp() ? '%t'.format(row.getUptime()) : $t('Interface is down') }}<br/>
+              <strong>MAC</strong>: {{ row.getDevice() ? row.getDevice().macaddr : '' }}<br/>
+              <strong>RX</strong>: {{ '%mB'.format(row.getStatistics().rx_bytes) }}<br/>
+              <strong>TX</strong>: {{ '%mB'.format(row.getStatistics().tx_bytes) }}<br/>
+              <strong>IPv4</strong>: {{ row.getIPv4Addrs().join(',') }}<br/>
+              <strong>IPv6</strong>: {{ row.getIPv6Addrs().join(',') }}<br/>
             </template>
-            <ifname v-if="!floating"></ifname>
-            <ifname v-if="!virtual" multiple></ifname>
-          </uci-tab>
-          <uci-tab :title="$t('Firewall Settings')" name="firewall" v-if="proto !== 'pppoe'">
-            <uci-option-list :label="$t('Create / Assign firewall-zone')" name="_fwzone" :options="zones" :load="loadZone" :save="saveZone" allow-create :description="$t('interface-config-zone-desc')"></uci-option-list>
-          </uci-tab>
-          <component v-if="proto !== '' && proto !== 'none'" :is="'proto-' + proto" @mounted="onProtoMounted"></component>
-        </uci-section>
-      </uci-form>
-    </el-dialog>
+          </el-table-column>
+        </el-table>
+        <uci-form config="network" :apply-timeout="15">
+          <uci-section :name="iface.name">
+            <uci-tab :title="$t('General Settings')" name="general">
+              <uci-option-switch :label="$t('Start on boot')" name="auto" initial="1"></uci-option-switch>
+              <uci-option-list :label="$t('Protocol')" name="proto" :options="protocols" initial="none" required @change="protoChanged"></uci-option-list>
+            </uci-tab>
+            <uci-tab :title="$t('Advanced Settings')" name="advanced">
+              <uci-option-switch :label="$t('Use builtin IPv6-management')" name="delegate" initial="1"></uci-option-switch>
+              <uci-option-switch :label="$t('Force link')" name="force_link" :initial="proto === 'static' ? true : false" :description="$t('Set interface properties regardless of the link carrier (If set, carrier sense events do not invoke hotplug handlers).')"></uci-option-switch>
+            </uci-tab>
+            <uci-tab :title="$t('Physical Settings')" name="physical">
+              <template v-if="!virtual">
+                <uci-option-switch :label="$t('Bridge interfaces')" name="type" active-value="bridge" :save="saveType" depend="proto == 'static' || proto == 'dhcp' || proto == 'none'" :description="$t('creates a bridge over specified interface(s)')"></uci-option-switch>
+                <uci-option-switch :label="$t('Enable STP')" name="stp" depend="type" :description="$t('Enables the Spanning Tree Protocol on this bridge')"></uci-option-switch>
+                <uci-option-switch :label="$t('Enable IGMP')" name="igmp_snooping" depend="type" :description="$t('Enables IGMP snooping on this bridge')"></uci-option-switch>
+              </template>
+              <ifname v-if="!floating"></ifname>
+              <ifname v-if="!virtual" multiple></ifname>
+            </uci-tab>
+            <uci-tab :title="$t('Firewall Settings')" name="firewall">
+              <uci-option-list :label="$t('Create / Assign firewall-zone')" name="_fwzone" :options="zones" :load="loadZone" :save="saveZone" allow-create :description="$t('interface-config-zone-desc')"></uci-option-list>
+            </uci-tab>
+            <component v-if="proto !== '' && proto !== 'none'" :is="'proto-' + proto" @mounted="onProtoMounted"></component>
+          </uci-section>
+        </uci-form>
+      </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
-
 <script>
-import NetworkBadge from './network-badge.vue'
+
 import ProtoDhcp from './proto/dhcp.vue'
 import ProtoStatic from './proto/static.vue'
 import ProtoPppoe from './proto/pppoe.vue'
@@ -69,14 +56,14 @@ import Ifname from './ifname.vue'
 export default {
   data() {
     return {
-      proto: '',
       virtual: false,
       floating: false,
       interfaces: [],
       devices: [],
       zones: [],
-      dialogVisible: false,
-      editorIface: '',
+      editorIface: 'lan',
+      proto:'',
+      info:[],
       protocols: [
         ['none', this.$t('Unmanaged')],
         ['dhcp', this.$t('DHCP Client')],
@@ -89,7 +76,6 @@ export default {
     }
   },
   components: {
-    NetworkBadge,
     ProtoDhcp,
     ProtoStatic,
     ProtoPppoe,
@@ -98,34 +84,24 @@ export default {
     Proto3g,
     Ifname
   },
-  computed: {
-    dialogTitle() {
-      return `${this.$t('Configure')} "${this.editorIface}"`
-    }
-  },
   timers: {
-    load: {time: 3000, autostart: true, immediate: true, repeat: true}
+    upgrade_info: {time: 3000, autostart: true, immediate: true, repeat: true}
   },
   methods: {
-    load() {
+    onProtoMounted(proto) {
+      this.virtual = proto.virtual;
+      this.floating = proto.floating;
+    },
+    update_info(tab) {
       this.$network.load().then(() => {
-        this.interfaces = this.$network.getInterfaces();
-      });
-      this.$uci.load('network').then(() => {
-        const sections = this.$uci.sections('network', 'interface');
-        sections.forEach(s => {
-          if (s['.name'] === 'wan') {
-            this.proto = s.proto;
-          }
-        })
-      });
+        this.info = this.$network.getInterfaces().filter(d => d.name === tab.name);
+      })
     },
     protoChanged(proto) {
       this.proto = proto;
     },
-    onProtoMounted(proto) {
-      this.virtual = proto.virtual;
-      this.floating = proto.floating;
+    upgrade_info() {
+      this.info = this.$network.getInterfaces().filter(d => d.name === this.editorIface);
     },
     saveType(sid, value) {
       this.$uci.set('network', sid, 'type', value || '');
@@ -211,8 +187,16 @@ export default {
         this.add(r.value);
       });
     }
+  },
+
+  created() {
+    this.$network.load().then(() => {
+      this.interfaces = this.$network.getInterfaces();
+      this.info = this.$network.getInterfaces().filter(d => d.name === 'lan');
+    });
   }
 }
+
 </script>
 
 <style lang="scss">
