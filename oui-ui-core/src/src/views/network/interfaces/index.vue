@@ -37,7 +37,7 @@
             <uci-option-switch :label="$t('Use builtin IPv6-management')" name="delegate" initial="1"></uci-option-switch>
             <uci-option-switch :label="$t('Force link')" name="force_link" :initial="proto === 'static' ? true : false" :description="$t('Set interface properties regardless of the link carrier (If set, carrier sense events do not invoke hotplug handlers).')"></uci-option-switch>
           </uci-tab>
-          <uci-tab :title="$t('Physical Settings')" name="physical">
+          <uci-tab :title="$t('Physical Settings')" name="physical" v-if="proto !== 'pppoe'">
             <template v-if="!virtual">
               <uci-option-switch :label="$t('Bridge interfaces')" name="type" active-value="bridge" :save="saveType" depend="proto == 'static' || proto == 'dhcp' || proto == 'none'" :description="$t('creates a bridge over specified interface(s)')"></uci-option-switch>
               <uci-option-switch :label="$t('Enable STP')" name="stp" depend="type" :description="$t('Enables the Spanning Tree Protocol on this bridge')"></uci-option-switch>
@@ -46,7 +46,7 @@
             <ifname v-if="!floating"></ifname>
             <ifname v-if="!virtual" multiple></ifname>
           </uci-tab>
-          <uci-tab :title="$t('Firewall Settings')" name="firewall">
+          <uci-tab :title="$t('Firewall Settings')" name="firewall" v-if="proto !== 'pppoe'">
             <uci-option-list :label="$t('Create / Assign firewall-zone')" name="_fwzone" :options="zones" :load="loadZone" :save="saveZone" allow-create :description="$t('interface-config-zone-desc')"></uci-option-list>
           </uci-tab>
           <component v-if="proto !== '' && proto !== 'none'" :is="'proto-' + proto" @mounted="onProtoMounted"></component>
@@ -110,6 +110,14 @@ export default {
     load() {
       this.$network.load().then(() => {
         this.interfaces = this.$network.getInterfaces();
+      });
+      this.$uci.load('network').then(() => {
+        const sections = this.$uci.sections('network', 'interface');
+        sections.forEach(s => {
+          if (s['.name'] === 'wan') {
+            this.proto = s.proto;
+          }
+        })
       });
     },
     protoChanged(proto) {
