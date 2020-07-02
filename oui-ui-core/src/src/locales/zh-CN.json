@@ -516,5 +516,6 @@
   "eqdisc options": "出站队列规则选项",
   "Link layer": "链路层",
   "wan interface": "广域网接口",
-  "lan interface": "局域网接口"
+  "lan interface": "局域网接口",
+  "Information": "信息"
 }

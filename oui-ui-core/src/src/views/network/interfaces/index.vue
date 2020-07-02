@@ -1,46 +1,54 @@
 <template>
   <div>
-    <el-tabs v-if="interfaces.length > 0" v-model="editorIface" type="border-card" @tab-click="update_info">
+    <el-tabs v-if="interfaces.length > 0" v-model="editorIface" type="border-card" @tab-click="update_info" closable @edit="pre_del">
       <el-tab-pane v-for="iface in interfaces" :key="iface.name" :name="iface.name" :label="iface.name">
         <el-table :data="info">
           <el-table-column :label="$t('Status')">
             <template v-slot="{ row }">
               <strong>{{ $t('Uptime') }}</strong>: {{ row.isUp() ? '%t'.format(row.getUptime()) : $t('Interface is down') }}<br/>
-              <strong>MAC</strong>: {{ row.getDevice() ? row.getDevice().macaddr : '' }}<br/>
               <strong>RX</strong>: {{ '%mB'.format(row.getStatistics().rx_bytes) }}<br/>
               <strong>TX</strong>: {{ '%mB'.format(row.getStatistics().tx_bytes) }}<br/>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('Information')">
+            <template v-slot="{ row }">
               <strong>IPv4</strong>: {{ row.getIPv4Addrs().join(',') }}<br/>
               <strong>IPv6</strong>: {{ row.getIPv6Addrs().join(',') }}<br/>
+              <strong>MAC</strong>: {{ row.getDevice() ? row.getDevice().macaddr : '' }}<br/>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('Edit')">
+            <template v-slot="{ row }">
+              <div class="edit">
+                <el-button size="mini" @click="ifup(row.name)">{{ $t('Start') }}</el-button>
+                <el-button size="mini" @click="ifdown(row.name)">{{ $t('Stop') }}</el-button><br />
+                <p></p>
+              </div>
+              <div class="edit">
+                <el-button type="primary" size="mini" @click="edit(row.name)">{{ $t('Edit') }}</el-button>
+                <el-button type="danger" size="mini" @click="del(row.name)">{{ $t('Delete') }}</el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
-        <uci-form config="network" :apply-timeout="15">
-          <uci-section :name="iface.name">
-            <uci-tab :title="$t('General Settings')" name="general">
-              <uci-option-switch :label="$t('Start on boot')" name="auto" initial="1"></uci-option-switch>
-              <uci-option-list :label="$t('Protocol')" name="proto" :options="protocols" initial="none" required @change="protoChanged"></uci-option-list>
-            </uci-tab>
-            <uci-tab :title="$t('Advanced Settings')" name="advanced">
-              <uci-option-switch :label="$t('Use builtin IPv6-management')" name="delegate" initial="1"></uci-option-switch>
-              <uci-option-switch :label="$t('Force link')" name="force_link" :initial="proto === 'static' ? true : false" :description="$t('Set interface properties regardless of the link carrier (If set, carrier sense events do not invoke hotplug handlers).')"></uci-option-switch>
-            </uci-tab>
-            <uci-tab :title="$t('Physical Settings')" name="physical">
-              <template v-if="!virtual">
-                <uci-option-switch :label="$t('Bridge interfaces')" name="type" active-value="bridge" :save="saveType" depend="proto == 'static' || proto == 'dhcp' || proto == 'none'" :description="$t('creates a bridge over specified interface(s)')"></uci-option-switch>
-                <uci-option-switch :label="$t('Enable STP')" name="stp" depend="type" :description="$t('Enables the Spanning Tree Protocol on this bridge')"></uci-option-switch>
-                <uci-option-switch :label="$t('Enable IGMP')" name="igmp_snooping" depend="type" :description="$t('Enables IGMP snooping on this bridge')"></uci-option-switch>
-              </template>
-              <ifname v-if="!floating"></ifname>
-              <ifname v-if="!virtual" multiple></ifname>
-            </uci-tab>
-            <uci-tab :title="$t('Firewall Settings')" name="firewall">
-              <uci-option-list :label="$t('Create / Assign firewall-zone')" name="_fwzone" :options="zones" :load="loadZone" :save="saveZone" allow-create :description="$t('interface-config-zone-desc')"></uci-option-list>
-            </uci-tab>
-            <component v-if="proto !== '' && proto !== 'none'" :is="'proto-' + proto" @mounted="onProtoMounted"></component>
-          </uci-section>
-        </uci-form>
       </el-tab-pane>
+      <el-button type="primary" size="small" style="margin-top: 10px" @click="handleAdd">+ {{ $t('Add interface') }}</el-button>
     </el-tabs>
+    <el-dialog :title="dialogTitle" :visible.sync="dialogVisible" custom-class="interface-edit-dialog" :before-close="handleClose">
+      <uci-form config="network" v-if="dialogVisible" :apply-timeout="15">
+        <uci-section :name="editorIface">
+          <uci-tab :title="$t('General Settings')" name="general">
+            <uci-option-switch :label="$t('Start on boot')" name="auto" initial="1"></uci-option-switch>
+            <uci-option-list :label="$t('Protocol')" name="proto" :options="protocols" initial="none" required @change="protoChanged"></uci-option-list>
+          </uci-tab>
+          <uci-tab :title="$t('Advanced Settings')" name="advanced">
+            <uci-option-switch :label="$t('Use builtin IPv6-management')" name="delegate" initial="1"></uci-option-switch>
+            <uci-option-switch :label="$t('Force link')" name="force_link" :initial="proto === 'static' ? true : false" :description="$t('Set interface properties regardless of the link carrier (If set, carrier sense events do not invoke hotplug handlers).')"></uci-option-switch>
+          </uci-tab>
+          <component v-if="proto !== '' && proto !== 'none'" :is="'proto-' + proto" @mounted="onProtoMounted"></component>
+        </uci-section>
+      </uci-form>
+    </el-dialog>
   </div>
 </template>
 <script>
@@ -64,6 +72,7 @@ export default {
       editorIface: 'lan',
       proto:'',
       info:[],
+      dialogVisible:false,
       protocols: [
         ['none', this.$t('Unmanaged')],
         ['dhcp', this.$t('DHCP Client')],
@@ -84,15 +93,30 @@ export default {
     Proto3g,
     Ifname
   },
+  computed: {
+    dialogTitle() {
+      return `${this.$t('Configure')} "${this.editorIface}"`
+    }
+  },
   timers: {
     upgrade_info: {time: 3000, autostart: true, immediate: true, repeat: true}
   },
   methods: {
+    pre_del(name, action) {
+      if (action === 'remove') {
+        this.del(name);
+      }
+    },
+    handleClose(done) {
+      this.upgrade_info();
+      done();
+    },
     onProtoMounted(proto) {
       this.virtual = proto.virtual;
       this.floating = proto.floating;
     },
     update_info(tab) {
+      this.editorIface = tab.name;
       this.$network.load().then(() => {
         this.info = this.$network.getInterfaces().filter(d => d.name === tab.name);
       })
@@ -101,7 +125,10 @@ export default {
       this.proto = proto;
     },
     upgrade_info() {
-      this.info = this.$network.getInterfaces().filter(d => d.name === this.editorIface);
+      this.$network.load().then(() => {
+        this.interfaces = this.$network.getInterfaces();
+        this.info = this.$network.getInterfaces().filter(d => d.name === this.editorIface);
+      })
     },
     saveType(sid, value) {
       this.$uci.set('network', sid, 'type', value || '');
@@ -154,7 +181,8 @@ export default {
         this.$uci.del('network', name);
         this.$uci.save().then(() => {
           this.$uci.apply().then(() => {
-            this.load();
+            this.editorIface = 'lan';
+            this.upgrade_info();
             loading.close();
           });
         });
@@ -166,8 +194,10 @@ export default {
       this.$uci.add('network', 'interface', name);
       this.$uci.save().then(() => {
         this.$uci.apply().then(() => {
-          this.load();
           loading.close();
+          this.upgrade_info();
+          this.editorIface = name;
+          this.dialogVisible = true;
         });
       });
     },
