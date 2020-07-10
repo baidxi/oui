@@ -3,7 +3,11 @@ export default {
   inject: ['uciForm', 'uciSection'],
   props: {
     title: String,
-    name: String
+    name: String,
+    visible:{
+      type:Boolean,
+      default:true
+    }
   },
   computed: {
     isTableExpand() {

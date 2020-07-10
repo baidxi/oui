@@ -517,5 +517,6 @@
   "Link layer": "链路层",
   "wan interface": "广域网接口",
   "lan interface": "局域网接口",
-  "Information": "信息"
+  "Information": "信息",
+  "Loading... please waiting for a while...": "加载中，请稍后。。。"
 }

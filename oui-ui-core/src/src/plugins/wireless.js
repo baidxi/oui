@@ -16,7 +16,7 @@ wireless.getDevices = function() {
   });
 }
 
-wireless.getAssoclist = function() {
+wireless.getAssoclist = function(device) {
   return new Promise(resolve => {
     this.getDevices().then(devices => {
       const batch = [];
@@ -25,20 +25,27 @@ wireless.getAssoclist = function() {
         resolve([]);
         return;
       }
-
-      devices.forEach(dev => {
-        batch.push(['iwinfo', 'assoclist', {device: dev}]);
-      });
-
-      ubus.callBatch(batch).then(rs => {
+      if (device) {
         const assoclist = [];
-
-        rs.forEach(r => {
-          assoclist.push(...r.results);
+        ubus.call('iwinfo', 'assoclist', {device:device}).then(r => {
+          assoclist.push(r.results);
+          return resolve(assoclist);
+        });
+      } else {
+        devices.forEach(dev => {
+          batch.push(['iwinfo', 'assoclist', {device: dev}]);
         });
 
-        resolve(assoclist);
-      });
+        ubus.callBatch(batch).then(rs => {
+          const assoclist = [];
+
+          rs.forEach(r => {
+            assoclist.push(...r.results);
+          });
+
+          resolve(assoclist);
+        });
+      }
     });
   });
 }

@@ -10,6 +10,7 @@ export default {
   },
   inject: ['uciForm'],
   props: {
+    click:Function,
     /*
     ** The 'type' and 'name' must be provided at least one.
     ** If the name prop is provided, only the section whose name is equal to the name prop is rendered,
@@ -246,12 +247,13 @@ export default {
     },
     sectionView(sid, divider) {
       const views = [];
+      const tabs = this.tabs.filter(tab => tab.visible);
 
       if (this.addable && this.type && !this.name)
         views.push(<el-row><el-button style="float:right" type="danger" size="mini" on-click={this.del.bind(this, sid)}>{ this.$t('Delete') }</el-button></el-row>);
 
-      if (this.tabs.length > 0) {
-        const tabPanes = this.tabs.map(tab => {
+      if (tabs.length > 0) {
+        const tabPanes = tabs.map(tab => {
           const errNum = tab.getErrorNum(sid);
           return (
             <el-tab-pane name={tab.name}>
@@ -260,7 +262,10 @@ export default {
             </el-tab-pane>
           );
         });
-        views.push(<el-tabs value={this.tabs[0].name}>{ tabPanes }</el-tabs>);
+        if (this.click)
+          views.push(<el-tabs value={tabs[0].name} on-tab-click={this.click}>{ tabPanes }</el-tabs>);
+        else
+          views.push(<el-tabs value={tabs[0].name}>{ tabPanes }</el-tabs>);
       }
       const noTabOptions = this.arrayedOptions.filter(o => !o.tabName);
       views.push(noTabOptions.map(o => <uci-form-item option={o} sid={sid} />));
@@ -293,7 +298,10 @@ export default {
                   </el-tab-pane>
                 );
               });
-              views.push(<el-tabs value={this.tabs[0].name}>{ tabPanes }</el-tabs>);
+              if (this.click)
+                views.push(<el-tabs value={tabs[0].name} on-tab-click={this.click}>{ tabPanes }</el-tabs>);
+              else
+                views.push(<el-tabs value={tabs[0].name}>{ tabPanes }</el-tabs>);
             }
 
             const noTabOptions = this.arrayedTableExpandOptions.filter(o => !o.tabName);
