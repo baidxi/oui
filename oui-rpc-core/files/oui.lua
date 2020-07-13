@@ -449,19 +449,23 @@ local methods = {
         routes6 = {
             function(req, msg)
                 local routes = {}
-                for line in io.lines("/proc/net/ipv6_route") do
-                    local field = {}
-                    for e in line:gmatch("%S+") do
-                        field[#field + 1] = e
-                    end
+                local f = io.open("/proc/net/ipv6_route")
+                if (f ~= nil) then
+                    f:close()
+                    for line in io.lines("/proc/net/ipv6_route") do
+                        local field = {}
+                        for e in line:gmatch("%S+") do
+                            field[#field + 1] = e
+                        end
 
-                    routes[#routes + 1] = {
-                        target = parse_route6_addr(field[1], field[2]),
-                        source = parse_route6_addr(field[3], field[4]),
-                        nexthop = parse_route6_addr(field[5]),
-                        metric = tonumber(field[6], 16),
-                        device = field[10]
-                    }
+                        routes[#routes + 1] = {
+                            target = parse_route6_addr(field[1], field[2]),
+                            source = parse_route6_addr(field[3], field[4]),
+                            nexthop = parse_route6_addr(field[5]),
+                            metric = tonumber(field[6], 16),
+                            device = field[10]
+                        }
+                    end
                 end
                 ubus.reply(req, {routes = routes})
             end, {}
